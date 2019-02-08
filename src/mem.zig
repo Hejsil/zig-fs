@@ -22,6 +22,19 @@ pub const Fs = struct {
         };
     }
 
+    pub fn deinit(fs: *Fs) void {
+        var iter = fs.files.iterator(0);
+        while (iter.next()) |data|
+            data.deinit();
+
+        var iter2 = fs.lookup.iterator();
+        while (iter2.next()) |kv|
+            fs.allocator.free(kv.key);
+
+        fs.files.deinit();
+        fs.lookup.deinit();
+    }
+
     pub fn open(fs: *Fs, path: []const u8, flags: index.Open.Flags) !File {
         const data = if (fs.lookup.get(path)) |kv|
             fs.files.at(kv.value)
@@ -41,35 +54,47 @@ pub const Fs = struct {
             break :blk res;
         };
 
+        if ((flags & index.Open.Truncate) != 0)
+            try data.resize(0);
+
         return File{
-            .data =  data,
-            .pos_ = 0,  
+            .data = data,
+            .flags = flags,
+            .pos_ = 0,
         };
     }
 
-    pub fn close()
+    pub fn close(fs: *Fs, file: *File) error{}!void {
+        file.* = undefined;
+    }
 };
-
 
 pub const File = struct {
     data: *Fs.FileData,
+    flags: index.Open.Flags,
     pos_: usize,
-    
-    pub fn read(file: *File, buf: []u8) error{}![]u8 {
+
+    pub fn read(file: *File, buf: []u8) ![]u8 {
+        if ((file.flags & index.Open.Read) == 0)
+            return error.FileCannotBeRead;
+
         const start = math.min(file.pos_, file.data.len);
         const len = math.min(buf.len, file.data.len - file.pos_);
         mem.copy(u8, buf[0..len], file.data.toSlice()[start..][0..len]);
         file.pos_ += len;
         return buf[0..len];
     }
-    
+
     pub fn write(file: *File, buf: []const u8) !void {
+        if ((file.flags & index.Open.Write) == 0)
+            return error.FileCannotBeWritten;
+
         if (file.data.len < file.pos_ + buf.len) {
             const len = file.data.len;
             try file.data.resize(file.pos_ + buf.len);
             mem.set(u8, file.data.toSlice()[len..], 0);
         }
-    
+
         mem.copy(u8, file.data.toSlice()[file.pos_..], buf);
         file.pos_ += buf.len;
     }
@@ -77,7 +102,7 @@ pub const File = struct {
     pub fn seek(file: *File, p: u64) !void {
         file.pos_ = try math.cast(usize, p);
     }
-    
+
     pub fn pos(file: *File) u64 {
         return file.pos_;
     }
@@ -91,6 +116,7 @@ test "fs.mem" {
     var buf: [1000]u8 = undefined;
     var fba = heap.FixedBufferAllocator.init(&buf);
     var fs = Fs.init(&fba.allocator);
+    defer fs.deinit();
 
     {
         var file = try fs.open("test", index.Open.Create | index.Open.Write);
@@ -101,7 +127,7 @@ test "fs.mem" {
         try file.write("sihT");
         debug.assertOrPanic(file.pos() == 4);
         debug.assertOrPanic(file.size() == 14);
-        //try fs.close(file);
+        try fs.close(&file);
     }
 
     {
@@ -111,6 +137,6 @@ test "fs.mem" {
         debug.assertOrPanic(file.pos() == 14);
         debug.assertOrPanic(file.size() == 14);
         debug.assertOrPanic(mem.eql(u8, text, "sihT is a test"));
-        //try fs.close(file);
+        try fs.close(&file);
     }
 }
