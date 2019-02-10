@@ -3,7 +3,7 @@ const std = @import("std");
 const mem = std.mem;
 const heap = std.heap;
 const math = std.math;
-const debug = std.debug;
+const testing = std.testing;
 
 pub const Fs = struct {
     const Lookup = std.AutoHashMap([]const u8, usize);
@@ -121,12 +121,12 @@ test "fs.mem" {
     {
         var file = try fs.open("test", index.Open.Create | index.Open.Write);
         try file.write("This is a test");
-        debug.assertOrPanic(file.pos() == 14);
-        debug.assertOrPanic(file.size() == 14);
+        testing.expectEqual(u64(14), file.pos());
+        testing.expectEqual(u64(14), file.size());
         try file.seek(0);
         try file.write("sihT");
-        debug.assertOrPanic(file.pos() == 4);
-        debug.assertOrPanic(file.size() == 14);
+        testing.expectEqual(u64(4), file.pos());
+        testing.expectEqual(u64(14), file.size());
         try fs.close(&file);
     }
 
@@ -134,9 +134,9 @@ test "fs.mem" {
         var text_buf: [100]u8 = undefined;
         var file = try fs.open("test", index.Open.Read);
         const text = try file.read(&text_buf);
-        debug.assertOrPanic(file.pos() == 14);
-        debug.assertOrPanic(file.size() == 14);
-        debug.assertOrPanic(mem.eql(u8, text, "sihT is a test"));
+        testing.expectEqual(u64(14), file.pos());
+        testing.expectEqual(u64(14), file.size());
+        testing.expectEqualSlices(u8, "sihT is a test", text);
         try fs.close(&file);
     }
 }
