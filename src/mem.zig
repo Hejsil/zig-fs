@@ -1,9 +1,7 @@
 const index = @import("index.zig");
 const std = @import("std");
 const mem = std.mem;
-const heap = std.heap;
 const math = std.math;
-const testing = std.testing;
 
 pub const Fs = struct {
     const Lookup = std.AutoHashMap([]const u8, usize);
@@ -65,7 +63,7 @@ pub const Fs = struct {
         };
     }
 
-    pub fn close(fs: *Fs, file: *File) error{}!void {
+    pub fn close(fs: *Fs, file: *File) void {
         file.* = undefined;
     }
 };
@@ -104,40 +102,11 @@ pub const File = struct {
         file.pos_ = try math.cast(usize, p);
     }
 
-    pub fn pos(file: *File) u64 {
-        return file.pos_;
+    pub fn pos(file: *File) error{}!u64 {
+        return u64(file.pos_);
     }
 
-    pub fn size(file: *File) u64 {
-        return file.data.len;
+    pub fn size(file: *File) error{}!u64 {
+        return u64(file.data.len);
     }
 };
-
-test "fs.mem" {
-    var buf: [1000]u8 = undefined;
-    var fba = heap.FixedBufferAllocator.init(&buf);
-    var fs = Fs.init(&fba.allocator);
-    defer fs.deinit();
-
-    {
-        var file = try fs.open("test", index.Open.Create | index.Open.Write);
-        try file.write("This is a test");
-        testing.expectEqual(u64(14), file.pos());
-        testing.expectEqual(u64(14), file.size());
-        try file.seek(0);
-        try file.write("sihT");
-        testing.expectEqual(u64(4), file.pos());
-        testing.expectEqual(u64(14), file.size());
-        try fs.close(&file);
-    }
-
-    {
-        var text_buf: [100]u8 = undefined;
-        var file = try fs.open("test", index.Open.Read);
-        const text = try file.read(&text_buf);
-        testing.expectEqual(u64(14), file.pos());
-        testing.expectEqual(u64(14), file.size());
-        testing.expectEqualSlices(u8, "sihT is a test", text);
-        try fs.close(&file);
-    }
-}
