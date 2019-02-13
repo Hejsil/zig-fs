@@ -17,8 +17,8 @@ pub const Open = struct {
 
 test "fs" {
     const backends = []type{
-        mem.Fs,
         os.Fs,
+        mem.Fs,
     };
     debug.warn("\n");
     inline for (backends) |Fs| {
@@ -39,7 +39,7 @@ test "fs" {
 
         const file_name = "zig-cache/test_output";
         {
-            var file = try fs.open(file_name, Open.Create | Open.Write);
+            var file = try fs.open(file_name, Open.Create | Open.Truncate | Open.Write);
             try file.write("This is a test");
             testing.expectEqual(u64(14), try file.pos());
             testing.expectEqual(u64(14), try file.size());
